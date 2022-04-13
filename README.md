@@ -27,6 +27,7 @@ relatively simple need: to connect with someone to alert them to reach out.
 - Add Parts list
 - Add Schematic and board layout
 - Test power consumption
+- Add instructions for initializing and activating IoT SIM device
 
 
 ## Long Term
