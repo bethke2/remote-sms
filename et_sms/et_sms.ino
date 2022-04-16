@@ -40,6 +40,8 @@ the commented section below at the end of the setup() function.
   #define DEBUG_PRINTLN(...)
 #endif
 
+// TODO clean up typdef to be consistent (unsigned long vs uint32_t...)
+
 /* Pin Defs */
 #define FONA_RST 4
 #define FONA_KEY 12
@@ -48,10 +50,15 @@ the commented section below at the end of the setup() function.
 #define LED_WAIT 9 // Orange
 #define LED_OK  10 // Blue
 #define LED_ACK 11 // Green
+#define LEDPAT_OK 1000 
+#define LEDPAT_LONG 3000
+#define LEDPAT_SHORT 500
+#define FONA_WAKE 2000
+#define FONA_REST 3000
 
 // this is a large buffer for replies
 char replybuffer[255];
-const uint8_t DEBOUNCE 20  // ms for software switch debounce
+const uint8_t DEBOUNCE = 20;  // ms for software switch debounce
 
 
 #if (defined(__AVR__) || defined(ESP8266)) && !defined(__AVR_ATmega2560__)
@@ -133,15 +140,30 @@ void enterSleep(void)
   delay(10);
 
   // TODO build subroutine to start blinking the LED to let user know we got their input from button
-
-
-  
   // Wake up FONA
-  digitalWrite(FONA_KEY, LOW);
-  delay(2000);
-  digitalWrite(FONA_KEY, HIGH);
-  delay(3000);
+  unsigned long tick = millis();
+  uint8_t iter = 1;
   
+  digitalWrite(FONA_KEY, LOW);
+  boolean state = digitalRead(LED_OK);
+  while(millis() < tick + FONA_WAKE) {
+    if(millis() > tick + (iter*LEDPAT_OK)) {
+      digitalWrite(LED_OK, state);
+      state = !state;
+      iter += 1;
+    }
+  }
+  digitalWrite(FONA_KEY, HIGH);
+  tick = millis();
+  iter = 1;
+  while(millis() < tick + FONA_REST) {
+    if(millis() > tick + (iter*LEDPAT_OK)) {
+      digitalWrite(LED_OK, state);
+      state = !state;
+      iter += 1;
+    }
+  }
+  digitalWrite(LED_OK, LOW);
   if (! fona.begin(*fonaSerial)) {
     DEBUG_PRINTLN(F("Couldn't find FONA"));
     while(! fona.begin(*fonaSerial)) {
@@ -170,6 +192,14 @@ void setup() {
   pinMode(ALARM, INPUT_PULLUP);
   // Tie momentary button to ground s.t. pulls pin low when pressed.
   pinMode(BUTTON, INPUT_PULLUP);
+
+  // indicator LEDs
+  pinMode(LED_ACK, OUTPUT);
+  pinMode(LED_OK, OUTPUT);
+  pinMode(LED_WAIT, OUTPUT);
+  digitalWrite(LED_ACK, LOW);
+  digitalWrite(LED_OK, LOW);
+  digitalWrite(LED_WAIT, LOW);
   
   pinMode(FONA_KEY, OUTPUT);
   digitalWrite(FONA_KEY, HIGH);
@@ -184,6 +214,7 @@ void setup() {
   DEBUG_PRINTLN(F("Initializing....(May take 3 seconds)"));
 
   fonaSerial->begin(4800);
+  // TODO build status LED blink during bootup
   if (! fona.begin(*fonaSerial)) {
     DEBUG_PRINTLN(F("Couldn't find FONA"));
     while(! fona.begin(*fonaSerial)) {
@@ -266,19 +297,19 @@ void printMenu(void) {
 }
 
 
-void debounce_switch(pin) {
+void debounce_switch(uint8_t pin) {
   boolean state;
   boolean prior;
   
-  long counter = millis();
+  unsigned long counter = millis();
   prior = digitalRead(pin);
-  while( counter < counter + DEBOUNCE ) {
-	delay(2);
+  while( millis() < counter + DEBOUNCE ) {
+	delay(5);
 	state = digitalRead(pin);
-	if( state != prior ) {
-	  counter = millis();
-	  prior = state;
-	}
+  	if( state != prior ) {
+  	  counter = millis();
+  	  prior = state;
+  	}
   }
 
 }
