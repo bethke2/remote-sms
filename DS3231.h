@@ -108,6 +108,7 @@ class DS3231
 	void forceConversion(void);
 	float readTemperature(void);
 
+	void enableAlarmInt(void);
 	void setAlarm1(uint8_t dydw, uint8_t hour, uint8_t minute, uint8_t second, DS3231_alarm1_t mode, bool armed = true);
 	RTCAlarmTime getAlarm1(void);
 	DS3231_alarm1_t getAlarmType1(void);

@@ -562,6 +562,24 @@ float DS3231::readTemperature(void)
     return ((((short)msb << 8) | (short)lsb) >> 6) / 4.0f;
 }
 
+
+void DS3231::enableAlarmInt(void)
+{
+	uint8_t value = 0b10011101;
+	Wire.beginTransmission(DS3231_ADDRESS);
+	#if ARDUINO >= 100
+        Wire.write(DS3231_REG_CONTROL);
+		Wire.write(value);
+	#else
+        Wire.send(DS3231_REG_CONTROL);
+		Wire.send(value);
+    #endif
+	
+	Wire.endTransmission();
+
+}
+
+
 RTCAlarmTime DS3231::getAlarm1(void)
 {
     uint8_t values[4];

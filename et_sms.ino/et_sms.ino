@@ -163,14 +163,9 @@ void setup() {
   // Begins I2C bus for RTC comm
   myRTC.begin();
   
-  // Manually set RTC control register 
-  // Dev Note: The DS3231 lib used does not set this correctly
-  // so I manually do it here.  TODO Debug lib?
-  Wire.beginTransmission(DS3231_ADDRESS);
-  Wire.write(DS3231_REG_CONTROL);
-  Wire.write(0b10011101);
-  Wire.endTransmission();
-
+  // Set control register to enable interrupt (active LOW) on DS3231
+  myRTC.enableAlarmInt();
+  
   // INT/SQW pin on RTC is active low; use hw interrupt 
   pinMode(ALARM, INPUT_PULLUP);
   // Tie momentary button to ground s.t. pulls pin low when pressed.
@@ -278,6 +273,7 @@ void debounce_switch(pin) {
   long counter = millis();
   prior = digitalRead(pin);
   while( counter < counter + DEBOUNCE ) {
+	delay(2);
 	state = digitalRead(pin);
 	if( state != prior ) {
 	  counter = millis();
