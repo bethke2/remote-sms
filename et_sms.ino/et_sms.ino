@@ -51,6 +51,7 @@ the commented section below at the end of the setup() function.
 
 // this is a large buffer for replies
 char replybuffer[255];
+const uint8_t DEBOUNCE 20  // ms for software switch debounce
 
 
 #if (defined(__AVR__) || defined(ESP8266)) && !defined(__AVR_ATmega2560__)
@@ -270,6 +271,22 @@ void printMenu(void) {
 }
 
 
+void debounce_switch(pin) {
+  boolean state;
+  boolean prior;
+  
+  long counter = millis();
+  prior = digitalRead(pin);
+  while( counter < counter + DEBOUNCE ) {
+	state = digitalRead(pin);
+	if( state != prior ) {
+	  counter = millis();
+	  prior = state;
+	}
+  }
+
+}
+
 
 void loop() {
   DEBUG_PRINTLN("Sleeping...");
@@ -291,6 +308,7 @@ void loop() {
     }
     
     if(panic){      
+	  debounce_switch(BUTTON);
       DEBUG_PRINTLN("Alarm has been triggered...");  
       char sendto[] = "18477781009";
       char message[] = "Dorothys button has been pressed. Reply OK to light the ACK indicator.";
