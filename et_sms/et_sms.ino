@@ -46,7 +46,9 @@ the commented section below at the end of the setup() function.
 #define FONA_RST 4
 #define FONA_KEY 12
 #define ALARM 2
-#define BUTTON 3
+#define BUTTON_HELP 3 // Panic
+#define BUTTON_WORRY 5 // Worried
+#define BUTTON_OK 6 // I am OK
 #define LED_WAIT 9 // Orange
 #define LED_OK  10 // Blue
 #define LED_ACK 11 // Green
@@ -108,7 +110,7 @@ void alarmFunction() {
 /* ISR for button press */ 
 void buttonPress() {
   panic = true; // not really though, we got this
-  detachInterrupt(digitalPinToInterrupt(BUTTON));
+  detachInterrupt(digitalPinToInterrupt(BUTTON_HELP));
   // Clear INT flag
   EIFR = 0b00000001;
 }
@@ -129,7 +131,7 @@ void enterSleep(void)
   // Attach RTC alarm interrput. In Arduino UNO connect DS3231 INT/SQW to Arduino Pin 2
   attachInterrupt(digitalPinToInterrupt(ALARM), alarmFunction, FALLING);
   // Attach button press interrupt.  In arduino, connect grounded button to pin 3.
-  attachInterrupt(digitalPinToInterrupt(BUTTON), buttonPress, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_HELP), buttonPress, FALLING);
   delay(50);
 
   // CPU stops executing HERE
@@ -164,6 +166,8 @@ void enterSleep(void)
     }
   }
   digitalWrite(LED_OK, LOW);
+
+  
   if (! fona.begin(*fonaSerial)) {
     DEBUG_PRINTLN(F("Couldn't find FONA"));
     while(! fona.begin(*fonaSerial)) {
@@ -191,7 +195,7 @@ void setup() {
   // INT/SQW pin on RTC is active low; use hw interrupt 
   pinMode(ALARM, INPUT_PULLUP);
   // Tie momentary button to ground s.t. pulls pin low when pressed.
-  pinMode(BUTTON, INPUT_PULLUP);
+  pinMode(BUTTON_HELP, INPUT_PULLUP);
 
   // indicator LEDs
   pinMode(LED_ACK, OUTPUT);
@@ -316,10 +320,13 @@ void debounce_switch(uint8_t pin) {
 
 
 void loop() {
-  DEBUG_PRINTLN("Sleeping...");
+  
   while (!Serial.available() ) {
     // Power saving sleep. Will wake on external alarm
+    DEBUG_PRINTLN("Sleeping...");
     enterSleep();
+    
+    
     // Check condition to reconnect to the network
     if(isAlarm){      
       DEBUG_PRINTLN("Alarm has been triggered...");
@@ -332,21 +339,42 @@ void loop() {
       } else {
         DEBUG_PRINTLN(F("Sent!"));
       }
+      // re-enable interrupt
+      attachInterrupt(digitalPinToInterrupt(ALARM), alarmFunction, FALLING);
     }
     
-    if(panic){      
-	  debounce_switch(BUTTON);
-      DEBUG_PRINTLN("Alarm has been triggered...");  
-      char sendto[] = "18477781009";
-      char message[] = "Dorothys button has been pressed. Reply OK to light the ACK indicator.";
+    if(panic){
+      // wait for switch to settle (default=20ms)
+      debounce_switch(BUTTON_HELP);
+      
+      // Get which button was pressed.  Worry and ok are tied to pull down other pins when pressed.
+      if(!digitalRead(BUTTON_WORRY)){
+        DEBUG_PRINTLN("Worry button has been triggered...");  
+        char sendto[] = "18477781009";
+        char message[] = "Dorothy is worried. Reply OK to light the ACK indicator.";
+      } else if(!digitalRead(BUTTON_OK)){
+        DEBUG_PRINTLN("OK button has been triggered...");  
+        char sendto[] = "18477781009";
+        char message[] = "Dorothy is OK. Reply OK to light the ACK indicator.";
+      } else {
+        DEBUG_PRINTLN("Help button has been triggered...");  
+        char sendto[] = "18477781009";
+        char message[] = "Dorothy needs some help. Reply OK to light the ACK indicator.";
+      }
+  
       panic = false; // ohthankgod
+
       // TODO try again?
       if (!fona.sendSMS(sendto, message)) {
         DEBUG_PRINTLN(F("Failed"));
       } else {
         DEBUG_PRINTLN(F("Sent!"));
       }
+      // re-enable interrupt just in case
+      attachInterrupt(digitalPinToInterrupt(BUTTON_HELP), buttonPress, FALLING);
     }
+   
+      
     if (fona.available()) {
       Serial.write(fona.read());
     }
