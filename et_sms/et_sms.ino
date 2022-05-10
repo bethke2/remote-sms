@@ -28,7 +28,7 @@ the commented section below at the end of the setup() function.
 #include <Adafruit_FONA.h>
 #include <avr/sleep.h>
 #include <Wire.h>
-#include <DS3231.h>
+#include "src/DS3231.h"
 
 /* Command line printing for dev and debug */
 #define OUTPUT_READABLE //uncomment to enable human readable output
@@ -39,6 +39,9 @@ the commented section below at the end of the setup() function.
   #define DEBUG_PRINT(...)
   #define DEBUG_PRINTLN(...)
 #endif
+
+
+const boolean HWTEST = true; // bypasses Fona commands for testing timing and hardware inputs
 
 // TODO clean up typdef to be consistent (unsigned long vs uint32_t...)
 
@@ -167,12 +170,13 @@ void enterSleep(void)
   }
   digitalWrite(LED_OK, LOW);
 
-  
-  if (! fona.begin(*fonaSerial)) {
-    DEBUG_PRINTLN(F("Couldn't find FONA"));
-    while(! fona.begin(*fonaSerial)) {
-      DEBUG_PRINTLN("Retrying FONA serial boot in 10 seconds...");
-      delay(10000);
+  if(!HWTEST){
+    if (! fona.begin(*fonaSerial)) {
+      DEBUG_PRINTLN(F("Couldn't find FONA"));
+      while(! fona.begin(*fonaSerial)) {
+        DEBUG_PRINTLN("Retrying FONA serial boot in 10 seconds...");
+        delay(10000);
+      }
     }
   }
   
@@ -211,35 +215,37 @@ void setup() {
     
   myRTC.armAlarm1(true);
   // Manual (Year, Month, Day, Hour, Minute, Second)
-  myRTC.setDateTime(22, 4, 10, 10, 30, 0);
+  myRTC.setDateTime(22, 5, 10, 10, 30, 0);
   // setAlarm1(Date or Day, Hour, Minute, Second, Mode, Armed = true)
-  myRTC.setAlarm1(7, 10, 31, 0, DS3231_MATCH_DY_H_M_S, true);
+  myRTC.setAlarm1(2, 10, 31, 0, DS3231_MATCH_DY_H_M_S, true);
 
   DEBUG_PRINTLN(F("Initializing....(May take 3 seconds)"));
 
-  fonaSerial->begin(4800);
-  // TODO build status LED blink during bootup
-  if (! fona.begin(*fonaSerial)) {
-    DEBUG_PRINTLN(F("Couldn't find FONA"));
-    while(! fona.begin(*fonaSerial)) {
-      DEBUG_PRINTLN("Retrying FONA serial boot in 10 seconds...");
-      delay(10000);
+  if(!HWTEST){
+    fonaSerial->begin(4800);
+    // TODO build status LED blink during bootup
+    if (! fona.begin(*fonaSerial)) {
+      DEBUG_PRINTLN(F("Couldn't find FONA"));
+      while(! fona.begin(*fonaSerial)) {
+        DEBUG_PRINTLN("Retrying FONA serial boot in 10 seconds...");
+        delay(10000);
+      }
     }
-  }
-  DEBUG_PRINTLN(F("FONA is OK"));
+    DEBUG_PRINTLN(F("FONA is OK"));
+    
+    // Print module IMEI number.
+    char imei[16] = {0}; // MUST use a 16 character buffer for IMEI!
+    uint8_t imeiLen = fona.getIMEI(imei);
+    if (imeiLen > 0) {
+      DEBUG_PRINT("Module IMEI: "); DEBUG_PRINTLN(imei);
+    }
   
-  // Print module IMEI number.
-  char imei[16] = {0}; // MUST use a 16 character buffer for IMEI!
-  uint8_t imeiLen = fona.getIMEI(imei);
-  if (imeiLen > 0) {
-    DEBUG_PRINT("Module IMEI: "); DEBUG_PRINTLN(imei);
+    // Provider of the sim defines APN, username,
+    // and password values.  Username and password are optional and
+    // can be removed, but APN is required.
+    fona.setGPRSNetworkSettings(F("m2mglobal"), F(""), F(""));
+    delay(10);
   }
-
-  // Provider of the sim defines APN, username,
-  // and password values.  Username and password are optional and
-  // can be removed, but APN is required.
-  fona.setGPRSNetworkSettings(F("m2mglobal"), F(""), F(""));
-  delay(10);
   
   // Optionally configure HTTP gets to follow redirects over SSL.
   // Default is not to follow SSL redirects, however if you uncomment
@@ -334,10 +340,12 @@ void loop() {
       char message[] = "Standard connection test successful. Unit will return to standby.";
       isAlarm = false;
       // TODO try again?
-      if (!fona.sendSMS(sendto, message)) {
-        DEBUG_PRINTLN(F("Failed"));
-      } else {
-        DEBUG_PRINTLN(F("Sent!"));
+      if(!HWTEST){
+        if (!fona.sendSMS(sendto, message)) {
+          DEBUG_PRINTLN(F("Failed"));
+        } else {
+          DEBUG_PRINTLN(F("Sent!"));
+        }
       }
       // re-enable interrupt
       attachInterrupt(digitalPinToInterrupt(ALARM), alarmFunction, FALLING);
@@ -346,37 +354,41 @@ void loop() {
     if(panic){
       // wait for switch to settle (default=20ms)
       debounce_switch(BUTTON_HELP);
-      
+      char sendto[] = "18477781009";
+      char message[140];
       // Get which button was pressed.  Worry and ok are tied to pull down other pins when pressed.
       if(!digitalRead(BUTTON_WORRY)){
         DEBUG_PRINTLN("Worry button has been triggered...");  
-        char sendto[] = "18477781009";
-        char message[] = "Dorothy is worried. Reply OK to light the ACK indicator.";
+        
+        strcpy(message, "Dorothy is worried. Reply OK to light the ACK indicator.\0");
       } else if(!digitalRead(BUTTON_OK)){
         DEBUG_PRINTLN("OK button has been triggered...");  
-        char sendto[] = "18477781009";
-        char message[] = "Dorothy is OK. Reply OK to light the ACK indicator.";
+        
+        strcpy(message, "Dorothy is OK. Reply OK to light the ACK indicator.\0");
       } else {
         DEBUG_PRINTLN("Help button has been triggered...");  
-        char sendto[] = "18477781009";
-        char message[] = "Dorothy needs some help. Reply OK to light the ACK indicator.";
+        
+        strcpy(message, "Dorothy needs some help. Reply OK to light the ACK indicator.\0");
       }
   
       panic = false; // ohthankgod
 
-      // TODO try again?
-      if (!fona.sendSMS(sendto, message)) {
-        DEBUG_PRINTLN(F("Failed"));
-      } else {
-        DEBUG_PRINTLN(F("Sent!"));
+      if(!HWTEST){
+        // TODO try again?
+        if (!fona.sendSMS(sendto, message)) {
+          DEBUG_PRINTLN(F("Failed"));
+        } else {
+          DEBUG_PRINTLN(F("Sent!"));
+        }
       }
       // re-enable interrupt just in case
       attachInterrupt(digitalPinToInterrupt(BUTTON_HELP), buttonPress, FALLING);
     }
    
-      
-    if (fona.available()) {
-      Serial.write(fona.read());
+    if(!HWTEST){
+      if (fona.available()) {
+        Serial.write(fona.read());
+      }
     }
     
   }
@@ -386,7 +398,7 @@ void loop() {
   char command = Serial.read();
   DEBUG_PRINTLN(command);
 
-
+  if(!HWTEST){
   switch (command) {
     case '?': {
         printMenu();
@@ -968,6 +980,8 @@ void loop() {
   while (fona.available()) {
     Serial.write(fona.read());
   }
+
+  }// end of if HWTEST
 
 }// end of loop()
 
