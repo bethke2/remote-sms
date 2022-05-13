@@ -49,9 +49,10 @@ const boolean HWTEST = true; // bypasses Fona commands for testing timing and ha
 #define FONA_RST 4
 #define FONA_KEY 12
 #define ALARM 2
-#define BUTTON_HELP 3 // Panic
-#define BUTTON_WORRY 5 // Worried
-#define BUTTON_OK 6 // I am OK
+#define BUTTON_PRESS 3 
+#define BUTTON_PANIC 7 // Panic
+#define BUTTON_WORRY 6 // Worried
+#define BUTTON_OK 5 // I am OK
 #define LED_WAIT 9 // Orange
 #define LED_OK  10 // Blue
 #define LED_ACK 11 // Green
@@ -73,8 +74,8 @@ const uint8_t DEBOUNCE = 20;  // ms for software switch debounce
   // and uncomment the HardwareSerial line
   #include <SoftwareSerial.h>
   
-  #define FONA_RX 5
-  #define FONA_TX 6
+  #define FONA_RX 8
+  #define FONA_TX 9
   SoftwareSerial fonaSS = SoftwareSerial(FONA_TX, FONA_RX);
   SoftwareSerial *fonaSerial = &fonaSS;
 
